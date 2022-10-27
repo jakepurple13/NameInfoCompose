@@ -1,6 +1,5 @@
 package com.programmersbox.nameinfocompose
 
-import android.R.attr.radius
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -8,15 +7,12 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
-import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -26,15 +22,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.center
-import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.text.*
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -43,20 +37,26 @@ import com.programmersbox.nameinfocompose.ui.theme.NameInfoComposeTheme
 import com.skydoves.landscapist.components.rememberImageComponent
 import com.skydoves.landscapist.glide.GlideImage
 import com.skydoves.landscapist.palette.PalettePlugin
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
-import kotlin.math.cos
+import kotlinx.coroutines.runBlocking
+import java.util.*
 import kotlin.math.roundToInt
-import kotlin.math.sin
 
 
 class MainActivity : ComponentActivity() {
+
+    private val db by lazy { NameInfoDatabase.getInstance(this) }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             NameInfoComposeTheme {
                 // A surface container using the 'background' color from the theme
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    NameInfoCompose()
+                    NameInfoCompose(viewModel { NameInfoViewModel(db) })
                 }
             }
         }
@@ -105,7 +105,7 @@ fun FirstRow(vm: NameInfoViewModel) {
     ) {
         ElevatedCard(modifier = Modifier.weight(1f)) {
             Crossfade(targetState = vm.state) { state ->
-                when(state) {
+                when (state) {
                     NetworkState.Loading -> {
                         CircularProgressIndicator()
                     }
@@ -135,7 +135,10 @@ fun FirstRow(vm: NameInfoViewModel) {
                 Circle(
                     progress = gender?.probability ?: 0f,
                     strokeColor = animateColorAsState(gender?.genderColor ?: MaterialTheme.colorScheme.primary).value,
-                    backgroundColor = animateColorAsState(gender?.genderColorInverse ?: MaterialTheme.colorScheme.background).value,
+                    backgroundColor = animateColorAsState(
+                        gender?.genderColorInverse ?: MaterialTheme.colorScheme.background
+                    ).value,
+                    textColor = animateColorAsState(gender?.genderColor ?: MaterialTheme.colorScheme.primary).value,
                     modifier = Modifier
                         .size(90.dp)
                         .padding(4.dp)
@@ -162,6 +165,7 @@ fun SecondRow(vm: NameInfoViewModel) {
                         progress = animateFloatAsState(country.probability * 100).value,
                         strokeColor = palette?.vibrantSwatch?.rgb?.toComposeColor()
                             ?: MaterialTheme.colorScheme.primary,
+                        textColor = MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier
                             .size(90.dp)
                             .padding(4.dp)
@@ -196,7 +200,7 @@ fun Recent(vm: NameInfoViewModel) {
     ) {
         items(vm.recent) { r ->
             ElevatedCard(onClick = { vm.onRecentPress(r) }) {
-                Row {
+                Row(modifier = Modifier.padding(4.dp)) {
 
                     Column {
 
@@ -211,7 +215,7 @@ fun Recent(vm: NameInfoViewModel) {
                         )
 
                         r.nationality.take(3).forEach {
-                            Row {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
                                 GlideImage(
                                     modifier = Modifier.size(12.dp),
                                     imageModel = { it.flagUrl },
@@ -251,6 +255,7 @@ fun Circle(
     progress: Float,
     modifier: Modifier = Modifier,
     strokeColor: Color = MaterialTheme.colorScheme.primary,
+    textColor: Color = strokeColor,
     backgroundColor: Color = MaterialTheme.colorScheme.background,
 ) {
     val progressAnimated by animateFloatAsState(progress)
@@ -276,7 +281,7 @@ fun Circle(
         drawText(
             textMeasurer = textMeasurer,
             text = "${progressAnimated.roundToInt()}%",
-            style = TextStyle(color = strokeColor),
+            style = TextStyle(color = textColor),
             topLeft = Offset(
                 (size.width - textSize.width) / 2f,
                 (size.height - textSize.height) / 2f
@@ -285,11 +290,11 @@ fun Circle(
     }
 }
 
-class NameInfoViewModel : ViewModel() {
+class NameInfoViewModel(private val db: NameInfoDatabase) : ViewModel() {
 
     private val service = ApiService()
     var state by mutableStateOf(NetworkState.NotLoading)
-    var recent = mutableStateListOf<IfyInfo>()
+    val recent = mutableStateListOf<IfyInfo>()
     var name by mutableStateOf("")
     var ifyInfo by mutableStateOf(
         IfyInfo(
@@ -299,20 +304,32 @@ class NameInfoViewModel : ViewModel() {
         )
     )
 
+    init {
+        db.nameInfoDao()
+            .getAll()
+            .onEach {
+                recent.clear()
+                recent.addAll(it)
+            }
+            .launchIn(viewModelScope)
+
+        runBlocking { db.nameInfoDao().getAll().firstOrNull()?.lastOrNull()?.let { ifyInfo = it } }
+    }
+
     fun getInfo() {
         viewModelScope.launch {
             state = NetworkState.Loading
-            service.getInfo(name).fold(
-                onSuccess = {
-                    println(it)
-                    ifyInfo = it
-                    if(recent.any { i -> i.name == it.name }) {
-                        recent.removeIf { i -> i.name == it.name }
-                    }
-                    recent.add(it)
-                },
-                onFailure = { it.printStackTrace() }
-            )
+            val n = name.trim()
+                .replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
+            recent.find { it.name == n }?.let { ifyInfo = it } ?: run {
+                service.getInfo(n).fold(
+                    onSuccess = {
+                        ifyInfo = it
+                        db.nameInfoDao().insert(it)
+                    },
+                    onFailure = { it.printStackTrace() }
+                )
+            }
             state = NetworkState.NotLoading
         }
     }

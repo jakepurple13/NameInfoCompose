@@ -1,5 +1,8 @@
 package com.programmersbox.nameinfocompose
 
+import androidx.room.ColumnInfo
+import androidx.room.Entity
+import androidx.room.PrimaryKey
 import com.programmersbox.nameinfocompose.ui.theme.FemaleColor
 import com.programmersbox.nameinfocompose.ui.theme.MaleColor
 import io.ktor.client.*
@@ -7,10 +10,9 @@ import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
-import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import java.util.*
 
 class ApiService {
@@ -78,11 +80,17 @@ data class Gender(val gender: String, val probability: Float) {
         gender.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
 }
 
+@Entity
 @Serializable
 data class IfyInfo(
+    @PrimaryKey
+    @ColumnInfo(name = "name")
     val name: String = "",
+    @ColumnInfo(name = "age")
     val age: Int = 0,
+    @ColumnInfo(name = "gender")
     val gender: Gender? = Gender("", 0f),
+    @ColumnInfo(name = "nationality")
     val nationality: List<Country> = emptyList()
 )
 
