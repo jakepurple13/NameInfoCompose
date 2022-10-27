@@ -158,7 +158,10 @@ fun SecondRow(vm: NameInfoViewModel) {
     ) {
         items(vm.ifyInfo.nationality) { country ->
             ElevatedCard {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(4.dp)
+                ) {
                     var palette by remember { mutableStateOf<Palette?>(null) }
 
                     Circle(
@@ -285,7 +288,7 @@ fun Circle(
             topLeft = Offset(
                 (size.width - textSize.width) / 2f,
                 (size.height - textSize.height) / 2f
-            ),
+            )
         )
     }
 }
@@ -309,7 +312,7 @@ class NameInfoViewModel(private val db: NameInfoDatabase) : ViewModel() {
             .getAll()
             .onEach {
                 recent.clear()
-                recent.addAll(it)
+                recent.addAll(it.reversed())
             }
             .launchIn(viewModelScope)
 
