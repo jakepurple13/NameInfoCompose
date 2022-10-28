@@ -21,10 +21,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.geometry.*
+import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.text.*
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
@@ -361,5 +361,36 @@ fun CirclePreview() {
             progress = 80f,
             modifier = Modifier.size(50.dp)
         )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun CanvasPreview() {
+    NameInfoComposeTheme {
+        Canvas(modifier = Modifier.size(50.dp)) {
+            drawRoundRect(
+                color = Color.Blue,
+                size = Size(width = 100f, height = 25f),
+                cornerRadius = CornerRadius(x = 20f, y = 20f),
+                topLeft = size.center.copy(x = 20f, y = size.center.y - 50f - 2f),
+                style = Stroke(8f)
+            )
+            drawIntoCanvas {
+                it.nativeCanvas.drawRoundRect(
+                    Rect(
+                        size.center.copy(x = 20f, y = size.center.y - 12.5f),
+                        Size(width = 100f, height = 25f)
+                    ).toAndroidRectF(),
+                    20f,
+                    20f,
+                    Paint().asFrameworkPaint().apply {
+                        strokeWidth = 8f
+                        color = Color.Blue.toArgb()
+                        style = android.graphics.Paint.Style.STROKE
+                    }
+                )
+            }
+        }
     }
 }
