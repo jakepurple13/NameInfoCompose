@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.text.*
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -257,9 +258,12 @@ fun Int.toComposeColor() = Color(this)
 fun Circle(
     progress: Float,
     modifier: Modifier = Modifier,
+    max: Int = 100,
+    strokeWidth: Dp = 8.dp,
     strokeColor: Color = MaterialTheme.colorScheme.primary,
     textColor: Color = strokeColor,
     backgroundColor: Color = MaterialTheme.colorScheme.background,
+    textStyle: TextStyle = TextStyle(color = textColor)
 ) {
     val progressAnimated by animateFloatAsState(progress)
     val textMeasurer = rememberTextMeasurer()
@@ -270,21 +274,21 @@ fun Circle(
         drawCircle(
             color = backgroundColor,
             radius = size.minDimension / 2,
-            style = Stroke(8f)
+            style = Stroke(strokeWidth.value)
         )
 
         drawArc(
             color = strokeColor,
             useCenter = false,
             startAngle = 270f,
-            sweepAngle = progressAnimated / 100 * 360,
-            style = Stroke(8f, cap = StrokeCap.Round),
+            sweepAngle = progressAnimated / max * 360,
+            style = Stroke(strokeWidth.value, cap = StrokeCap.Round),
         )
 
         drawText(
             textMeasurer = textMeasurer,
             text = "${progressAnimated.roundToInt()}%",
-            style = TextStyle(color = textColor),
+            style = textStyle,
             topLeft = Offset(
                 (size.width - textSize.width) / 2f,
                 (size.height - textSize.height) / 2f
